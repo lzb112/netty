@@ -61,10 +61,16 @@ public abstract class MultithreadEventExecutorGroup extends AbstractEventExecuto
     /**
      * Create a new instance.
      *
-     * @param nThreads          the number of threads that will be used by this instance.
+     * @param nThreads          不传默认昰0，如果昰0，默认就是CPU核数*2
      * @param executor          the Executor to use, or {@code null} if the default should be used.
      * @param chooserFactory    the {@link EventExecutorChooserFactory} to use.
      * @param args              arguments which will passed to each {@link #newChild(Executor, Object...)} call
+     *
+     *          //args[0] SelectorProvider
+     *         //args[1] 轮询策略
+     *         //args[2] 线程池拒绝策略
+     *         //args[3] 队列工厂
+     *
      */
     protected MultithreadEventExecutorGroup(int nThreads, Executor executor,
                                             EventExecutorChooserFactory chooserFactory, Object... args) {
@@ -73,14 +79,18 @@ public abstract class MultithreadEventExecutorGroup extends AbstractEventExecuto
         }
 
         if (executor == null) {
+            //创建线程工厂
+            //newDefaultThreadFactory已经在子类MultithreadEventLoopGroup重写，这里点进去的代码是不对的
             executor = new ThreadPerTaskExecutor(newDefaultThreadFactory());
         }
 
         children = new EventExecutor[nThreads];
 
+        //循环创建
         for (int i = 0; i < nThreads; i ++) {
             boolean success = false;
             try {
+                //创建Netty自己专用的执行器
                 children[i] = newChild(executor, args);
                 success = true;
             } catch (Exception e) {
@@ -107,7 +117,7 @@ public abstract class MultithreadEventExecutorGroup extends AbstractEventExecuto
                 }
             }
         }
-
+        //策略选择工厂，即请求来了用哪个执行器处理
         chooser = chooserFactory.newChooser(children);
 
         final FutureListener<Object> terminationListener = new FutureListener<Object>() {

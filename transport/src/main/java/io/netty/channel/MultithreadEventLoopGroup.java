@@ -65,11 +65,13 @@ public abstract class MultithreadEventLoopGroup extends MultithreadEventExecutor
      */
     protected MultithreadEventLoopGroup(int nThreads, Executor executor, EventExecutorChooserFactory chooserFactory,
                                      Object... args) {
+        //如果传进来的昰0，那么就等于DEFAULT_EVENT_LOOP_THREADS，DEFAULT_EVENT_LOOP_THREADS=CPU核数*2
         super(nThreads == 0 ? DEFAULT_EVENT_LOOP_THREADS : nThreads, executor, chooserFactory, args);
     }
 
     @Override
     protected ThreadFactory newDefaultThreadFactory() {
+        //创建一个优先级为10的默认线程池
         return new DefaultThreadFactory(getClass(), Thread.MAX_PRIORITY);
     }
 

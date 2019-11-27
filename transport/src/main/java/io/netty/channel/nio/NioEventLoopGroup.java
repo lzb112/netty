@@ -61,6 +61,7 @@ public class NioEventLoopGroup extends MultithreadEventLoopGroup {
     }
 
     public NioEventLoopGroup(int nThreads, Executor executor) {
+        //SelectorProvider.provider()用于NIO打开Select或者获取Socket
         this(nThreads, executor, SelectorProvider.provider());
     }
 
@@ -133,6 +134,10 @@ public class NioEventLoopGroup extends MultithreadEventLoopGroup {
 
     @Override
     protected EventLoop newChild(Executor executor, Object... args) throws Exception {
+        //args[0] SelectorProvider
+        //args[1] 轮询策略
+        //args[2] 线程池拒绝策略
+        //args[3] 队列工厂
         EventLoopTaskQueueFactory queueFactory = args.length == 4 ? (EventLoopTaskQueueFactory) args[3] : null;
         return new NioEventLoop(this, executor, (SelectorProvider) args[0],
             ((SelectStrategyFactory) args[1]).newSelectStrategy(), (RejectedExecutionHandler) args[2], queueFactory);

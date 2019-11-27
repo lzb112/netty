@@ -21,6 +21,10 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
+/**
+ * Netty自实现的集合
+ * 主要用数组的方式替换掉SelectorImpl的hashSet方法，提高轮询效率
+ */
 final class SelectedSelectionKeySet extends AbstractSet<SelectionKey> {
 
     SelectionKey[] keys;

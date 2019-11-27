@@ -17,6 +17,9 @@ package io.netty.channel;
 
 /**
  * Factory which uses the default select strategy.
+ *
+ * 选择策略工厂
+ * 用于Netty轮询选择处理的selector的时候的轮询策略
  */
 public final class DefaultSelectStrategyFactory implements SelectStrategyFactory {
     public static final SelectStrategyFactory INSTANCE = new DefaultSelectStrategyFactory();

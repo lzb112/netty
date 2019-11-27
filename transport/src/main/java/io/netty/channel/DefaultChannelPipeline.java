@@ -90,14 +90,18 @@ public class DefaultChannelPipeline implements ChannelPipeline {
     private boolean registered;
 
     protected DefaultChannelPipeline(Channel channel) {
+
         this.channel = ObjectUtil.checkNotNull(channel, "channel");
         succeededFuture = new SucceededChannelFuture(channel, null);
         voidPromise =  new VoidChannelPromise(channel, true);
 
+        //尾节点
         tail = new TailContext(this);
+        //头结点
         head = new HeadContext(this);
-
+        //头的下一个
         head.next = tail;
+        //第一个
         tail.prev = head;
     }
 
@@ -197,6 +201,7 @@ public class DefaultChannelPipeline implements ChannelPipeline {
 
     @Override
     public final ChannelPipeline addLast(EventExecutorGroup group, String name, ChannelHandler handler) {
+        //所有处理器都会用AbstractChannelHandlerContext来检查包装
         final AbstractChannelHandlerContext newCtx;
         synchronized (this) {
             checkMultiplicity(handler);
@@ -224,12 +229,20 @@ public class DefaultChannelPipeline implements ChannelPipeline {
         return this;
     }
 
+    /**
+     * = =就是双向链表插入
+     * 插入原素上一节点=当前结点
+     * 插入原素下一节点=当前的下一个
+     * 当前节点下一个=插入原素
+     * 当前下一个原素头指针=插入原素
+     * @param newCtx
+     */
     private void addLast0(AbstractChannelHandlerContext newCtx) {
-        AbstractChannelHandlerContext prev = tail.prev;
-        newCtx.prev = prev;
-        newCtx.next = tail;
-        prev.next = newCtx;
-        tail.prev = newCtx;
+        AbstractChannelHandlerContext prev = tail.prev;//prev=头
+        newCtx.prev = prev;//  newCtx.prev=头
+        newCtx.next = tail;//  newCtx.next=尾
+        prev.next = newCtx;//  头的下一个=newCtx
+        tail.prev = newCtx;//  尾的前一个=newCtx
     }
 
     @Override
@@ -599,6 +612,7 @@ public class DefaultChannelPipeline implements ChannelPipeline {
     private static void checkMultiplicity(ChannelHandler handler) {
         if (handler instanceof ChannelHandlerAdapter) {
             ChannelHandlerAdapter h = (ChannelHandlerAdapter) handler;
+            //@ChannelHandler.Sharable注解，加载处理器类上面表示这个处理器为单例模式,如果是单例模式，并且已经添加了，就会抛异常
             if (!h.isSharable() && h.added) {
                 throw new ChannelPipelineException(
                         h.getClass().getName() +

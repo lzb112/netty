@@ -155,8 +155,11 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
                                         RejectedExecutionHandler rejectedHandler) {
         super(parent);
         this.addTaskWakesUp = addTaskWakesUp;
+        //默认最大任务数 21亿多
         this.maxPendingTasks = Math.max(16, maxPendingTasks);
+        //执行器，暂时没看明白，继续往下
         this.executor = ThreadExecutorMap.apply(executor, this);
+        //因为maxPendingTasks几乎等于无限，所以创建LinkedBlockingQueue阻塞的无界队列。。压根就没阻塞
         taskQueue = newTaskQueue(this.maxPendingTasks);
         rejectedExecutionHandler = ObjectUtil.checkNotNull(rejectedHandler, "rejectedHandler");
     }
@@ -837,6 +840,7 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
 
     private void execute(Runnable task, boolean immediate) {
         boolean inEventLoop = inEventLoop();
+        //将任务加入线程队列
         addTask(task);
         if (!inEventLoop) {
             startThread();
@@ -987,9 +991,11 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
 
     private void doStartThread() {
         assert thread == null;
+        //真正的启动线程
         executor.execute(new Runnable() {
             @Override
             public void run() {
+                //执行的线程保存起来，那么inEventLoop就是true了
                 thread = Thread.currentThread();
                 if (interrupted) {
                     thread.interrupt();

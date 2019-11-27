@@ -71,6 +71,7 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
         this.parent = parent;
         id = newId();
         unsafe = newUnsafe();
+        //创建pipeline(重点)
         pipeline = newChannelPipeline();
     }
 
@@ -464,11 +465,13 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
             }
 
             AbstractChannel.this.eventLoop = eventLoop;
-
+            //eventLoop.inEventLoop()判断代码执行线程是否本类保存的线程,串行无锁化,首次必需为flase
             if (eventLoop.inEventLoop()) {
                 register0(promise);
             } else {
+
                 try {
+                    //将注册作为一个线程任务丢进去
                     eventLoop.execute(new Runnable() {
                         @Override
                         public void run() {

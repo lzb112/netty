@@ -98,6 +98,12 @@ public class DefaultThreadFactory implements ThreadFactory {
         this.threadGroup = threadGroup;
     }
 
+    /**
+     *
+     * @param poolName 线程池名称
+     * @param daemon    是否守护线程
+     * @param priority  优先级
+     */
     public DefaultThreadFactory(String poolName, boolean daemon, int priority) {
         this(poolName, daemon, priority, System.getSecurityManager() == null ?
                 Thread.currentThread().getThreadGroup() : System.getSecurityManager().getThreadGroup());
@@ -105,6 +111,7 @@ public class DefaultThreadFactory implements ThreadFactory {
 
     @Override
     public Thread newThread(Runnable r) {
+        //创建的昰FastThreadLocalRunnable线程，netty自己封装的线程
         Thread t = newThread(FastThreadLocalRunnable.wrap(r), prefix + nextId.incrementAndGet());
         try {
             if (t.isDaemon() != daemon) {

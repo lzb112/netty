@@ -135,6 +135,9 @@ public final class NioEventLoop extends SingleThreadEventLoop {
     NioEventLoop(NioEventLoopGroup parent, Executor executor, SelectorProvider selectorProvider,
                  SelectStrategy strategy, RejectedExecutionHandler rejectedExecutionHandler,
                  EventLoopTaskQueueFactory queueFactory) {
+
+
+
         super(parent, executor, false, newTaskQueue(queueFactory), newTaskQueue(queueFactory),
                 rejectedExecutionHandler);
         if (selectorProvider == null) {
@@ -143,7 +146,9 @@ public final class NioEventLoop extends SingleThreadEventLoop {
         if (strategy == null) {
             throw new NullPointerException("selectStrategy");
         }
+        //抽象工厂模式
         provider = selectorProvider;
+        //用上面的工厂新建一个selector
         final SelectorTuple selectorTuple = openSelector();
         selector = selectorTuple.selector;
         unwrappedSelector = selectorTuple.unwrappedSelector;
@@ -159,7 +164,9 @@ public final class NioEventLoop extends SingleThreadEventLoop {
     }
 
     private static final class SelectorTuple {
+        //未包装但是已经替换属性的Selector
         final Selector unwrappedSelector;
+        //Netty自己封装的Selector
         final Selector selector;
 
         SelectorTuple(Selector unwrappedSelector) {
@@ -184,7 +191,7 @@ public final class NioEventLoop extends SingleThreadEventLoop {
         if (DISABLE_KEY_SET_OPTIMIZATION) {
             return new SelectorTuple(unwrappedSelector);
         }
-
+        //获取原始NIO的Selector类
         Object maybeSelectorImplClass = AccessController.doPrivileged(new PrivilegedAction<Object>() {
             @Override
             public Object run() {
@@ -199,6 +206,7 @@ public final class NioEventLoop extends SingleThreadEventLoop {
             }
         });
 
+        //当maybeSelectorImplClass不为类类型或者maybeSelectorImplClass不是继承于Selector,那么就直接用SelectorTuple封装返回，这里主要针对自定义的
         if (!(maybeSelectorImplClass instanceof Class) ||
             // ensure the current selector implementation is what we can instrument.
             !((Class<?>) maybeSelectorImplClass).isAssignableFrom(unwrappedSelector.getClass())) {
@@ -210,32 +218,34 @@ public final class NioEventLoop extends SingleThreadEventLoop {
         }
 
         final Class<?> selectorImplClass = (Class<?>) maybeSelectorImplClass;
+
         final SelectedSelectionKeySet selectedKeySet = new SelectedSelectionKeySet();
 
         Object maybeException = AccessController.doPrivileged(new PrivilegedAction<Object>() {
             @Override
             public Object run() {
                 try {
+                    //通过反射拿出Selector原类的selectedKeys与publicSelectedKeys的字段描述
                     Field selectedKeysField = selectorImplClass.getDeclaredField("selectedKeys");
                     Field publicSelectedKeysField = selectorImplClass.getDeclaredField("publicSelectedKeys");
 
-                    if (PlatformDependent.javaVersion() >= 9 && PlatformDependent.hasUnsafe()) {
-                        // Let us try to use sun.misc.Unsafe to replace the SelectionKeySet.
-                        // This allows us to also do this in Java9+ without any extra flags.
-                        long selectedKeysFieldOffset = PlatformDependent.objectFieldOffset(selectedKeysField);
-                        long publicSelectedKeysFieldOffset =
-                                PlatformDependent.objectFieldOffset(publicSelectedKeysField);
-
-                        if (selectedKeysFieldOffset != -1 && publicSelectedKeysFieldOffset != -1) {
-                            PlatformDependent.putObject(
-                                    unwrappedSelector, selectedKeysFieldOffset, selectedKeySet);
-                            PlatformDependent.putObject(
-                                    unwrappedSelector, publicSelectedKeysFieldOffset, selectedKeySet);
-                            return null;
-                        }
-                        // We could not retrieve the offset, lets try reflection as last-resort.
-                    }
-
+//                    if (PlatformDependent.javaVersion() >= 9 && PlatformDependent.hasUnsafe()) {
+//                        // Let us try to use sun.misc.Unsafe to replace the SelectionKeySet.
+//                        // This allows us to also do this in Java9+ without any extra flags.
+//                        long selectedKeysFieldOffset = PlatformDependent.objectFieldOffset(selectedKeysField);
+//                        long publicSelectedKeysFieldOffset =
+//                                PlatformDependent.objectFieldOffset(publicSelectedKeysField);
+//
+//                        if (selectedKeysFieldOffset != -1 && publicSelectedKeysFieldOffset != -1) {
+//                            PlatformDependent.putObject(
+//                                    unwrappedSelector, selectedKeysFieldOffset, selectedKeySet);
+//                            PlatformDependent.putObject(
+//                                    unwrappedSelector, publicSelectedKeysFieldOffset, selectedKeySet);
+//                            return null;
+//                        }
+//                        // We could not retrieve the offset, lets try reflection as last-resort.
+//                    }
+                    //设置可访问属性为true,就是将非public变量权限改为可见
                     Throwable cause = ReflectionUtil.trySetAccessible(selectedKeysField, true);
                     if (cause != null) {
                         return cause;
@@ -244,7 +254,7 @@ public final class NioEventLoop extends SingleThreadEventLoop {
                     if (cause != null) {
                         return cause;
                     }
-
+                    //用SelectedSelectionKeySet替换掉原始NIO里面Selector的HashSet,改为数组实现，提高轮询效率
                     selectedKeysField.set(unwrappedSelector, selectedKeySet);
                     publicSelectedKeysField.set(unwrappedSelector, selectedKeySet);
                     return null;
@@ -256,14 +266,18 @@ public final class NioEventLoop extends SingleThreadEventLoop {
             }
         });
 
+        //如果发生异常
         if (maybeException instanceof Exception) {
             selectedKeys = null;
             Exception e = (Exception) maybeException;
             logger.trace("failed to instrument a special java.util.Set into: {}", unwrappedSelector, e);
             return new SelectorTuple(unwrappedSelector);
         }
+        //这里也存一个
         selectedKeys = selectedKeySet;
         logger.trace("instrumented a special java.util.Set into: {}", unwrappedSelector);
+        //然后将Selector包装返回，Netty用的就是SelectedSelectionKeySetSelector这个自己包装过的Selector对象
+        //SelectorTuple存着未包装以及已经包装的Selector
         return new SelectorTuple(unwrappedSelector,
                                  new SelectedSelectionKeySetSelector(unwrappedSelector, selectedKeySet));
     }
@@ -441,6 +455,13 @@ public final class NioEventLoop extends SingleThreadEventLoop {
         }
     }
 
+
+    /**
+     * 这里是开线程执行的
+     * 1.轮询IO事件
+     * 2.处理IO事件
+     * 3.处理任务队列
+     */
     @Override
     protected void run() {
         for (;;) {
@@ -506,6 +527,7 @@ public final class NioEventLoop extends SingleThreadEventLoop {
                         processSelectedKeys();
                     } finally {
                         // Ensure we always run tasks.
+                        //执行任务队列
                         runAllTasks();
                     }
                 } else {
